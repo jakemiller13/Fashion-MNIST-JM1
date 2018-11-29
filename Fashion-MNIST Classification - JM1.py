@@ -109,37 +109,45 @@ def create_loaders(train_dataset, validation_dataset):
     validation_loader = DataLoader(validation_dataset, batch_size = 5000)
     return train_loader, validation_loader
 
-def train_model(model, epochs, train_loader, optimizer, criterion):
+def train_model(model, epochs, train_loader, validation_loader,
+                optimizer, criterion, loss_list, accuracy_list,
+                n_val_dataset):
     '''
     Trains "model" for "n_epochs" using "train_loader, optimizer, criterion"
     '''
     for epoch in range(epochs):
-        print('Evaluating epoch: ' + str(epoch + 1) + '/' + str(epochs))
+        print('\nEvaluating epoch: ' + str(epoch + 1) + '/' + str(epochs))
         for x, y in train_loader:
             optimizer.zero_grad()
             output = model(x)
             loss = criterion(output, y)
             loss.backward()
             optimizer.step()
+        loss_list.append(loss.data)
+        accuracy = check_accuracy(model, validation_loader, n_val_dataset,)
+        accuracy_list.append(accuracy)
+        print('Accuracy after {} epochs: {}%'.format(epoch + 1,
+              accuracy * 100))
 
-def check_accuracy(model, validation_loader, validation_dataset):
+def check_accuracy(model, validation_loader, n_val_dataset):
     '''
     Checks accuracy of "model" using "validation_loader, validation_dataset"
     '''
     correct = 0      
+    print('Validating accuracy...')
     for x, y in validation_loader:
-        print('Validating accuracy...')
         output = model(x)
         _, y_hat = torch.max(output.data, 1)
         correct += (y_hat == y).sum().item()
-    accuracy = correct / len(validation_dataset)
-    print('Accuracy on 10000 images: ' + str(accuracy * 100) + '%')
+    accuracy = correct / n_val_dataset
+    return accuracy
 
 def check_misclassified(model, validation_dataset, n_misclassified):
     '''
     Checks first n_misclassified
     '''
     count = 0
+    print('\n-- First {} misclassified --'.format(n_misclassified))
     for x, y in DataLoader(dataset = validation_dataset, batch_size=1):
         output = model(x)
         _, y_hat=torch.max(output, 1)
@@ -151,6 +159,25 @@ def check_misclassified(model, validation_dataset, n_misclassified):
             count += 1
         if count >= n_misclassified:
             break
+
+def show_plots(epochs, loss_list, accuracy_list):
+    '''
+    Plots loss and accuracy over epochs
+    '''
+    fig, ax1 = plt.subplots()
+    
+    ax1.plot(range(epochs), loss_list, 'b-')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss', color = 'b')
+    ax1.tick_params('y', colors = 'b')
+    
+    ax2 = ax1.twinx()
+    ax2.plot(range(epochs), accuracy_list, 'm-')
+    ax2.set_ylabel('Accuracy', color = 'm')
+    ax2.tick_params('y', colors = 'm')
+    
+    plt.show()
+    
 
 #############
 # CNN MODEL #
@@ -188,9 +215,15 @@ accuracy_list = []
 train_dataset, validation_dataset = create_datasets()
 train_loader, validation_loader = create_loaders(train_dataset,
                                                  validation_dataset)
-train_model(model, epochs, train_loader, optimizer, criterion)
-check_accuracy(model, validation_loader, validation_dataset)
+train_model(model, epochs, train_loader, validation_loader, optimizer,
+            criterion, loss_list, accuracy_list,
+            n_val_dataset = len(validation_dataset))
+final_accuracy = check_accuracy(model, validation_loader,
+                                n_val_dataset = len(validation_dataset))
+print('Accuracy on {} images after {} epochs: {}%'.
+      format(len(validation_dataset), epochs + 1, final_accuracy * 100))
 check_misclassified(model, validation_dataset, n_misclassified = 5)
+show_plots(epochs, loss_list, accuracy_list)
 
 ##########################
 # A COUPLE OF FUN CHECKS #

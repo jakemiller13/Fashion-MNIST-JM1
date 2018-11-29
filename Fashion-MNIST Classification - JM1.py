@@ -110,12 +110,14 @@ def create_loaders(train_dataset, validation_dataset):
     return train_loader, validation_loader
 
 def train_model(model, epochs, train_loader, validation_loader,
-                optimizer, criterion, loss_list, accuracy_list,
-                n_val_dataset):
+                optimizer, criterion, loss_list, train_accuracy_list,
+                val_accuracy_list, n_train_dataset, n_val_dataset):
     '''
     Trains "model" for "n_epochs" using "train_loader, optimizer, criterion"
     '''
     for epoch in range(epochs):
+        model.train()
+        train_correct = 0
         print('\nEvaluating epoch: ' + str(epoch + 1) + '/' + str(epochs))
         for x, y in train_loader:
             optimizer.zero_grad()
@@ -123,17 +125,22 @@ def train_model(model, epochs, train_loader, validation_loader,
             loss = criterion(output, y)
             loss.backward()
             optimizer.step()
+            _, y_hat = torch.max(output.data, 1)
+            train_correct += (y_hat == y).sum().item()
         loss_list.append(loss.data)
-        accuracy = check_accuracy(model, validation_loader, n_val_dataset,)
-        accuracy_list.append(accuracy)
+        train_accuracy = train_correct / n_train_dataset
+        train_accuracy_list.append(train_accuracy)
+        val_accuracy = check_accuracy(model, validation_loader, n_val_dataset)
+        val_accuracy_list.append(val_accuracy)
         print('Accuracy after {} epochs: {}%'.format(epoch + 1,
-              accuracy * 100))
+              round(val_accuracy * 100, 2)))
 
 def check_accuracy(model, validation_loader, n_val_dataset):
     '''
     Checks accuracy of "model" using "validation_loader, validation_dataset"
     '''
-    correct = 0      
+    correct = 0
+    model.eval()
     print('Validating accuracy...')
     for x, y in validation_loader:
         output = model(x)
@@ -160,24 +167,24 @@ def check_misclassified(model, validation_dataset, n_misclassified):
         if count >= n_misclassified:
             break
 
-def show_plots(epochs, loss_list, accuracy_list):
+def show_plots(epochs, loss_list, train_accuracy_list, val_accuracy_list):
     '''
     Plots loss and accuracy over epochs
     '''
     fig, ax1 = plt.subplots()
     
-    ax1.plot(range(epochs), loss_list, 'b-')
+    ax1.plot(range(epochs), train_accuracy_list, label = 'Training Accuracy')
+    ax1.plot(range(epochs), val_accuracy_list, label = 'Validation Accuracy')
     ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss', color = 'b')
-    ax1.tick_params('y', colors = 'b')
+    ax1.set_ylabel('Accuracy')
+    plt.legend(loc = 'best')
     
     ax2 = ax1.twinx()
-    ax2.plot(range(epochs), accuracy_list, 'm-')
-    ax2.set_ylabel('Accuracy', color = 'm')
-    ax2.tick_params('y', colors = 'm')
+    ax2.plot(range(epochs), loss_list, label = 'Loss')
+    ax2.set_ylabel('Loss')
     
+    plt.legend(loc = 'best')
     plt.show()
-    
 
 #############
 # CNN MODEL #
@@ -187,10 +194,12 @@ model = nn.Sequential(OrderedDict([
                                   kernel_size = 5, padding = 2)),
         ('relu1',       nn.ReLU()),
         ('maxpool1',    nn.MaxPool2d(kernel_size = 2)),
+        ('dropout1',    nn.Dropout(0.3)),
         ('conv2',       nn.Conv2d(in_channels = 16, out_channels = 32,
                                   kernel_size = 5, stride = 1, padding = 2)),
         ('relu2',       nn.ReLU()),
         ('maxpool2',    nn.MaxPool2d(kernel_size = 2)),
+        ('dropout2',    nn.Dropout(0.3)),
         ('flatten',     Flatten()),
         ('dense1',      nn.Linear(32 * 7 * 7, 10))])) # multiplication?
 
@@ -207,7 +216,8 @@ epochs = 10
 
 # Create lists for accuracy dictionary - to be used in future for plotting
 loss_list = []
-accuracy_list = []
+train_accuracy_list = []
+val_accuracy_list = []
 
 #############
 # RUN MODEL #
@@ -216,20 +226,19 @@ train_dataset, validation_dataset = create_datasets()
 train_loader, validation_loader = create_loaders(train_dataset,
                                                  validation_dataset)
 train_model(model, epochs, train_loader, validation_loader, optimizer,
-            criterion, loss_list, accuracy_list,
+            criterion, loss_list, train_accuracy_list, val_accuracy_list,
+            n_train_dataset = len(train_dataset),
             n_val_dataset = len(validation_dataset))
 final_accuracy = check_accuracy(model, validation_loader,
                                 n_val_dataset = len(validation_dataset))
 print('Accuracy on {} images after {} epochs: {}%'.
       format(len(validation_dataset), epochs + 1, final_accuracy * 100))
 check_misclassified(model, validation_dataset, n_misclassified = 5)
-show_plots(epochs, loss_list, accuracy_list)
+show_plots(epochs, loss_list, train_accuracy_list, val_accuracy_list)
 
 ##########################
 # A COUPLE OF FUN CHECKS #
 ##########################
-
-show_image(train_dataset[rand_num])
 plot_parameters(model.state_dict()['conv1.weight'],
                 'First Convolutional Weights')
 plot_parameters(model.state_dict()['conv2.weight'],

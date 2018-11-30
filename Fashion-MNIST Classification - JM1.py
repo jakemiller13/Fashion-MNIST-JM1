@@ -105,8 +105,6 @@ def create_loaders(train_dataset, validation_dataset):
     '''
     Creates "train_loader" and "validation_loader" from respective datasets
     '''
-#    train_loader = DataLoader(train_dataset, batch_size = 100)
-#    validation_loader = DataLoader(validation_dataset, batch_size = 5000)
     train_loader = DataLoader(train_dataset, batch_size = 50)
     validation_loader = DataLoader(validation_dataset, batch_size = 50)
     return train_loader, validation_loader
@@ -135,8 +133,8 @@ def train_model(model, epochs, train_loader, validation_loader,
         val_accuracy = check_accuracy(model, validation_loader, n_val_dataset)
         val_accuracy_list.append(val_accuracy)
         print('-- Accuracy after {} epochs --\
-              -- Training: {}% --\
-              -- Validation: {}% --'.format(
+              \n----- Training: {}% -----\
+              \n---- Validation:  {}% ----'.format(
               epoch + 1,
               round(train_accuracy * 100, 2),
               round(val_accuracy * 100, 2)))
@@ -196,18 +194,18 @@ def show_plots(epochs, loss_list, train_accuracy_list, val_accuracy_list):
 # CNN MODEL #
 #############
 model = nn.Sequential(OrderedDict([
-        ('conv1',       nn.Conv2d(in_channels = 1, out_channels = 16,
-                                  kernel_size = 5, padding = 2)),
+        ('conv1',       nn.Conv2d(in_channels = 1, out_channels = 64,
+                                  kernel_size = 5, stride = 1, padding = 2)),
         ('relu1',       nn.ReLU()),
         ('maxpool1',    nn.MaxPool2d(kernel_size = 2)),
         ('dropout1',    nn.Dropout(0.5)),
-        ('conv2',       nn.Conv2d(in_channels = 16, out_channels = 32,
+        ('conv2',       nn.Conv2d(in_channels = 64, out_channels = 32,
                                   kernel_size = 5, stride = 1, padding = 2)),
         ('relu2',       nn.ReLU()),
         ('maxpool2',    nn.MaxPool2d(kernel_size = 2)),
         ('dropout2',    nn.Dropout(0.5)),
         ('flatten',     Flatten()),
-        ('dense1',      nn.Linear(32 * 7 * 7, 10))])) # multiplication?
+        ('dense1',      nn.Linear(32 * 7 * 7, 10))]))
 
 ###########
 # TESTING #
@@ -216,7 +214,7 @@ rand_num = np.random.randint(0,10)
 
 # Training/model constants
 #learning_rate = 0.1
-learning_rate = 0.005
+learning_rate = 0.001
 criterion = nn.CrossEntropyLoss()
 #optimizer = torch.optim.SGD(model.parameters(), lr = learning_rate)
 optimizer = torch.optim.Adam(model.parameters(), lr = learning_rate)
@@ -240,7 +238,7 @@ train_model(model, epochs, train_loader, validation_loader, optimizer,
 final_accuracy = check_accuracy(model, validation_loader,
                                 n_val_dataset = len(validation_dataset))
 print('Accuracy on {} images after {} epochs: {}%'.
-      format(len(validation_dataset), epochs + 1, final_accuracy * 100))
+      format(len(validation_dataset), epochs, final_accuracy * 100))
 check_misclassified(model, validation_dataset, n_misclassified = 5)
 show_plots(epochs, loss_list, train_accuracy_list, val_accuracy_list)
 
@@ -251,3 +249,5 @@ plot_parameters(model.state_dict()['conv1.weight'],
                 'First Convolutional Weights')
 plot_parameters(model.state_dict()['conv2.weight'],
                 'Second Convolutional Weights')
+
+##### Accuracy on 10000 images after 10 epochs: 90.11% #####

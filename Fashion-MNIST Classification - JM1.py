@@ -52,6 +52,22 @@ def index_to_class(index):
                   9 : 'Ankle boot'}
     return(class_dict[index])
 
+def get_activations(model, x):
+    '''
+    Returns activations on "x"
+    '''
+    x = x.view(1, 1, 28, 28)
+    activations, activation_names = [], []
+    
+    for i, layer in enumerate(model.modules()):
+        if i > 0:
+            x = layer(x)
+            if not any(word in str(layer) for word in ('MaxPool', 'Dropout',
+                                  'Flatten')):
+                activations.append(x)
+                activation_names.append(str(layer).split('(', 1)[0])
+    return activations, activation_names
+
 def plot_parameters(weights, title):
     '''
     Plots out kernel parameters for visualization
@@ -68,12 +84,36 @@ def plot_parameters(weights, title):
     for i, ax in enumerate(ax.flat):
         ax.set_xlabel('Kernel: ' + str(i + 1))
         ax.imshow(weights[i][0], vmin = min_value, vmax = max_value,
-                  cmap = 'plasma')
+                  cmap = 'seismic')
         ax.set_xticks([])
         ax.set_yticks([])
     
     plt.suptitle(title)
     plt.show()
+
+def plot_activations(model, x):
+    '''
+    Plots out activations for visualization
+    Activations is a list - will need to iterate through
+    '''
+    activations, activation_names = get_activations(model, x)
+    activations = [activation.detach().numpy() for activation in activations]
+    n_activations = activations[1][0].shape[0]
+    
+    min_values = [value.min().item() for value in activations]
+    max_values = [value.max().item() for value in activations]
+    
+    for i, layer in enumerate(activations):
+        fig, ax = plt.subplots(4, n_activations//4, figsize = (20,20))        
+        for j, ax in enumerate(ax.flat):
+            ax.set_xlabel('Activation: ' + str(j + 1))
+            ax.imshow(activations[0][0][j], vmin = min_values[i],
+                      vmax = max_values[i], cmap = 'seismic')
+            ax.set_xticks([])
+            ax.set_yticks([])
+    
+        plt.suptitle('Activation Layer [{}]'.format(activation_names[i]))
+        plt.show()
 
 class Flatten(nn.Module):
     '''
@@ -133,7 +173,7 @@ def train_model(model, epochs, train_loader, validation_loader,
         val_accuracy = check_accuracy(model, validation_loader, n_val_dataset)
         val_accuracy_list.append(val_accuracy)
         print('-- Accuracy after {} epochs --\
-              \n----- Training: {}% -----\
+              \n----- Training:  {}% -----\
               \n---- Validation:  {}% ----'.format(
               epoch + 1,
               round(train_accuracy * 100, 2),
@@ -249,5 +289,6 @@ plot_parameters(model.state_dict()['conv1.weight'],
                 'First Convolutional Weights')
 plot_parameters(model.state_dict()['conv2.weight'],
                 'Second Convolutional Weights')
+plot_activations(model, train_dataset[2][0])
 
-##### Accuracy on 10000 images after 10 epochs: 90.11% #####
+##### Accuracy on 10000 images after 10 epochs: 90.35% #####
